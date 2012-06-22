@@ -1,0 +1,98 @@
+/* Styles for MCQ Breakdown */
+
+.mcq.generaltable {
+  border-style: none;
+}
+
+.mcq.subheading {
+  font-weight: bold;
+}
+
+p.mcq.warningcell {
+  width: 50em;
+}
+
+p.mcq.warningcell span.warningheader {
+  font-weight: bold;
+}
+
+table.mcq.keytable td {
+  text-align: center;
+  width: 15em;
+}
+
+table.mcq.optionstable.print {
+  font-size: 75%;
+}
+
+table.mcq.optionstable .subheading {
+  background-color: white;
+  border: none;
+  text-align: left;
+}
+
+table.mcq.optionstable td.subsubheading {
+  font-weight: bold;
+}
+
+table.mcq.optionstable th.header {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+table.mcq.optionstable th.qnum {
+  padding-left: 2em;
+  padding-right: 2em;
+}
+
+table.mcq.print tr.optionschosen {
+  page-break-before: always;
+}
+
+table.mcq.print td {
+  border-style: solid;
+  border-collapse: collapse;
+  border-color: #999999;
+  border-width: 1px;
+}
+
+table.mcq td.numeric {
+  text-align: center;
+}
+
+table.mcq td.correct {
+  background-color: #CCFFCC;
+}
+
+table.mcq.print td.correct {
+  background-color: #808080;
+  font-weight: bold;
+}
+
+table.mcq td.partial {
+  background-color: #FFFFCC;
+}
+
+table.mcq.print td.partial {
+  background-color: #EEEEEE;
+}
+
+table.mcq td.unanswered {
+  background-color: #CCCCFF;
+}
+
+table.mcq.print td.unanswered {
+  background-color: #B6B6B6;
+}
+
+table.mcq.keytable.print td.subheading {
+  font-weight: bold;
+  border-style: none;
+  text-align: left;
+  width: 4em;
+}
+
+table.mcq.optionstable.print th.qnum {
+  padding-left: 1em;
+  padding-right: 1em;
+}
