@@ -1,5 +1,9 @@
 /* Styles for MCQ Breakdown */
 
+#page-content #region-main {
+ 	overflow: auto !important;
+}
+
 .mcq.generaltable {
   border-style: none;
 }
