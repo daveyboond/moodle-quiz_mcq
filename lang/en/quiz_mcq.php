@@ -48,6 +48,7 @@ $string['optioncounts'] = 'Option counts';
 $string['optionschosen'] = 'Options chosen';
 $string['orientation'] = 'Orientation';
 $string['partialoption'] = 'Partially correct option';
+$string['pluginname'] = 'MCQ breakdown';
 $string['portrait'] = 'Portrait';
 $string['printview'] = 'Print view';
 $string['qattempts'] = 'Questions attempted';
