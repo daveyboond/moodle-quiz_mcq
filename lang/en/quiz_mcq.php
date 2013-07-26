@@ -66,11 +66,9 @@ $string['unanswered'] = 'Unanswered';
 $string['userscompleting'] = 'Users completing quiz';
 $string['usersyettocomplete'] = 'Users yet to complete quiz';
 $string['warning'] = 'Warning';
-$string['warningaverage'] = 'The grading method used is \"Average\". However, tabulated grades '
-    . 'are based on the student\'s last attempt and therefore may differ from those shown elsewhere.';
+$string['warningaverage'] = 'The grading method used is \"Average\". However, tabulated grades are based on the student\'s last attempt and therefore may differ from those shown elsewhere.';
 $string['warningnomcq'] = 'There are no (non-random) multiple choice questions in this quiz so there are no data to display.';
-$string['warningnotallmcq'] = 'Only the multiple choice questions in this quiz are displayed below. '
-    . 'However, the grades shown include one or more questions of other types that are used in this quiz.';
+$string['warningnotallmcq'] = 'Only the multiple choice questions in this quiz are displayed below. However, the grades shown include one or more questions of other types that are used in this quiz.';
 $string['wholecourse'] = 'Whole course';
 $string['wholegrouping'] = 'Whole grouping';
 
