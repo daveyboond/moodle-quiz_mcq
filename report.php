@@ -600,10 +600,16 @@ class quiz_mcq_report extends quiz_default_report {
 
         // Output: Quiz close date and link to print view
         $quizclose = $quiz->timeclose ? userdate($quiz->timeclose) : get_string('never', 'quiz_mcq');
+        $groupidshttp = '';
+        foreach ($groupids as $gid) {
+            $groupidshttp .= "&groupid[]=$gid";
+        }
+        
         echo '<table width="100%"><tr><td class="mcq date"><span class="mcq subheading">'
-		    . get_string('quizcloses', 'quiz_mcq') . ':</span> ' . $quizclose . '</td>'
+	    . get_string('quizcloses', 'quiz_mcq') . ':</span> ' . $quizclose . '</td>'
             . '<td align="right"><a href="' . qualified_me()
-			. '&print=1" target="_blank">Print view</a></td></tr></table>';
+            . '&print=1' . $groupidshttp . '" target="_blank">'
+            . get_string('printview', 'quiz_mcq') . '</a></td></tr></table>';
 
         // Output: Sample drop-down
         echo '<form id="controlform" method="get" action="' . $reporturl . '">';
@@ -733,7 +739,7 @@ class quiz_mcq_report extends quiz_default_report {
         echo '<td colspan="4" class="subsubheading">' . get_string('totalcorrect', 'quiz_mcq') . '</th>';
         foreach ($mcq_keys as $q) {
             $noofcompleters = $noofuserattempts - $optioncounts[$q][0];
-			if ($noofcompleters == 0) { $noofcompleters = 1; } // Avoid division by zero
+            if ($noofcompleters == 0) { $noofcompleters = 1; } // Avoid division by zero
             echo '<td class="data numeric">' . $noofuserscorrect[$q]
                 . ' (' . round(100 * $noofuserscorrect[$q] / $noofcompleters) . '%)' . '</td>';
         }
@@ -882,7 +888,8 @@ class quiz_mcq_report extends quiz_default_report {
         // Calculate some local values
         $noofuncompletedusers = count($uncompletedusers);
         $noofusers = $noofuserattempts + $noofuncompletedusers;
-
+	if ($noofusers == 0) { $noofusers = 1; } // Avoid division by zero later on
+        
         echo '<table width="100%"><tr><td width="50%">';
 
         // Output: Quiz close date and link to print view
@@ -1022,10 +1029,11 @@ class quiz_mcq_report extends quiz_default_report {
             echo '<tr>';
             echo '<td colspan="4" class="subsubheading">' . get_string('totalcorrect', 'quiz_mcq') . '</th>';
             for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {
-			    $q = $mcq_keys[$qidx];
+                $q = $mcq_keys[$qidx];
+                $noofcompleters = $noofuserattempts - $optioncounts[$q][0];
+                if ($noofcompleters == 0) { $noofcompleters = 1; } // Avoid division by zero
                 echo '<td class="data numeric">' . $noofuserscorrect[$q]
-                    . ' (' . round(100 * $noofuserscorrect[$q] / ($noofuserattempts - $optioncounts[$q][0]))
-					. '%)' . '</td>';
+                    . ' (' . round(100 * $noofuserscorrect[$q] / $noofcompleters) . '%)' . '</td>';
             }
             echo '</tr>';
             echo '<tr>';
