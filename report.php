@@ -66,7 +66,7 @@ class quiz_mcq_report extends quiz_default_report {
         $print = optional_param('print', 0, PARAM_INT);
 		
         // Get context
-        $context = get_context_instance(CONTEXT_MODULE, $cm->id);
+        $context = context_module::instance($cm->id);
         $reporturl = $CFG->wwwroot.'/mod/quiz/report.php';
 
         // Start output.
@@ -149,8 +149,8 @@ class quiz_mcq_report extends quiz_default_report {
                 WHERE q.id = ?', array($allrealquestionids[$q]));
         
             // Is this a single-answer question?
-            $single = $DB->get_record('question_multichoice',
-			    array('question' => $allrealquestionids[$q]), 'single');
+            $single = $DB->get_record('qtype_multichoice_options',
+			    array('questionid' => $allrealquestionids[$q]), 'single');
 		
             if ($question->qtype == 'multichoice' or $question->qtype == 'truefalse') {
 			    $mcqids[$q] = array($allrealquestionids[$q], $single->single);
