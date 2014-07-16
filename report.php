@@ -64,7 +64,10 @@ class quiz_mcq_report extends quiz_default_report {
         $sort = optional_param('sort', 1, PARAM_INT);
         $highlightcorrect = optional_param('highlightcorrect', 1, PARAM_INT);
         $print = optional_param('print', 0, PARAM_INT);
-		
+
+         // Set appropriate page layout if necessary
+         if ($print == 1) $PAGE->set_pagelayout('base');
+        
         // Get context
         $context = context_module::instance($cm->id);
         $reporturl = $CFG->wwwroot.'/mod/quiz/report.php';
@@ -76,10 +79,10 @@ class quiz_mcq_report extends quiz_default_report {
 		// Start the group name arrays.
         $groupnames = array();
         if ($cm->groupingid > 0) {
-			$groups = groups_get_all_groups($course->id, 0, $cm->groupingid);
+            $groups = groups_get_all_groups($course->id, 0, $cm->groupingid);
             array_push($groupnames, array(0, get_string('wholegrouping', 'quiz_mcq')));
         } else {
-			$groups = groups_get_all_groups($course->id);
+            $groups = groups_get_all_groups($course->id);
             array_push($groupnames, array(0, get_string('wholecourse', 'quiz_mcq')));
         }
 
@@ -812,25 +815,25 @@ class quiz_mcq_report extends quiz_default_report {
 
                 // Cell classes depend on whether using positive or negative highlighting
                 if (in_array($opt, $fullycorrect[$q])) {
- 				    if ($highlightcorrect == 1) {
+                    if ($highlightcorrect == 1) {
                         $correctclass = ' class="numeric correct"';
-    				} else {
+                    } else {
                         $correctclass = ' class="numeric"';
-					}
+                    }
                 } else if (in_array($opt, $anycorrect[$q])) {
                     $correctclass = ' class="numeric partial"';
                 } else {
-				    if ($highlightcorrect == 1) {
+                    if ($highlightcorrect == 1) {
                         $correctclass = ' class="numeric"';
-					} else {
+                    } else {
                         $correctclass = ' class="numeric correct"';
-					}
+                    }
                 }                    
                 
                 // Override as unshaded if cell is not set
-				if (!isset($optioncounts[$q][$opt])) {
-				    $optioncounts[$q][$opt] = '';
-				}
+                if (!isset($optioncounts[$q][$opt])) {
+                    $optioncounts[$q][$opt] = '';
+                }
 				
                 if (preg_match('/^\s*$/', $optioncounts[$q][$opt])) {
                     $correctclass = ' class="numeric"';
@@ -1097,7 +1100,13 @@ class quiz_mcq_report extends quiz_default_report {
             echo '</tr>';
             // Data
             for ($opt = 0; $opt <= $maxoptions; $opt++) {
-                echo '<tr>';
+                // Avoid page breaks mid-table, where possible
+                if ($opt < $maxoptions) {
+                    $breakclass = 'class="printnobreak"';
+                } else {
+                    $breakclass = '';
+                }
+                echo '<tr ' . $breakclass . '>';
                 if ($opt == 0) {
                     echo '<td colspan="4">' . get_string('nochoice', 'quiz_mcq') . '</td>';
                 } else {
@@ -1108,25 +1117,25 @@ class quiz_mcq_report extends quiz_default_report {
                 
                     // Cell classes depend on whether using positive or negative highlighting
                     if (in_array($opt, $fullycorrect[$q])) {
-    				    if ($highlightcorrect == 1) {
+                        if ($highlightcorrect == 1) {
                             $correctclass = ' class="numeric correct"';
-	    				} else {
+                        } else {
                             $correctclass = ' class="numeric"';
-						}
+                        }
                     } else if (in_array($opt, $anycorrect[$q])) {
                         $correctclass = ' class="numeric partial"';
                     } else {
-					    if ($highlightcorrect == 1) {
+                        if ($highlightcorrect == 1) {
                             $correctclass = ' class="numeric"';
-						} else {
+                        } else {
                             $correctclass = ' class="numeric correct"';
-						}
+                        }
                     }
         
                     // Override as unshaded if cell is empty
-    				if (empty($optioncounts[$q][$opt])) {
-	    			    $optioncounts[$q][$opt] = '';
-		    		}
+                    if (!isset($optioncounts[$q][$opt])) {
+                        $optioncounts[$q][$opt] = '';
+                    }
 					
                     if (preg_match('/^\s*$/', $optioncounts[$q][$opt])) {
                         $correctclass = ' class="numeric"';

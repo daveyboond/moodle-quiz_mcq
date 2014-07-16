@@ -61,28 +61,28 @@ table.mcq td.numeric {
 }
 
 table.mcq td.correct {
-  background-color: #CCFFCC;
+  background-color: #CCFFCC !important;
 }
 
 table.mcq.print td.correct {
-  background-color: #808080;
+  background-color: #808080 !important;
   font-weight: bold;
 }
 
 table.mcq td.partial {
-  background-color: #FFFFCC;
+  background-color: #FFFFCC !important;
 }
 
 table.mcq.print td.partial {
-  background-color: #EEEEEE;
+  background-color: #EEEEEE !important;
 }
 
 table.mcq td.unanswered {
-  background-color: #CCCCFF;
+  background-color: #CCCCFF !important;
 }
 
 table.mcq.print td.unanswered {
-  background-color: #B6B6B6;
+  background-color: #B6B6B6 !important;
 }
 
 table.mcq.keytable.print td.subheading {
@@ -95,4 +95,10 @@ table.mcq.keytable.print td.subheading {
 table.mcq.optionstable.print th.qnum {
   padding-left: 1em;
   padding-right: 1em;
+}
+
+@media print {
+    table.mcq.print tr.printnobreak {
+        page-break-after: avoid;
+    }
 }
