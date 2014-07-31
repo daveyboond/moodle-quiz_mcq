@@ -139,7 +139,7 @@ class quiz_mcq_report extends quiz_default_report {
         }
 
         // Create an array of the multiple choice questions only, together with a flag to indicate
-		// single-answer questions in the original question order. Create a comma-separated list of the IDs.
+	// single-answer questions in the original question order. Create a comma-separated list of the IDs.
         $mcqids = array();
         $mcqidlist = '';
         $noofungradedquestions = 0;
@@ -153,10 +153,10 @@ class quiz_mcq_report extends quiz_default_report {
         
             // Is this a single-answer question?
             $single = $DB->get_record('qtype_multichoice_options',
-			    array('questionid' => $allrealquestionids[$q]), 'single');
+		array('questionid' => $allrealquestionids[$q]), 'single');
 		
             if ($question->qtype == 'multichoice' or $question->qtype == 'truefalse') {
-			    $mcqids[$q] = array($allrealquestionids[$q], $single->single);
+		$mcqids[$q] = array($allrealquestionids[$q], $single->single);
                 $mcqidlist .= $allrealquestionids[$q] . ',';
             } else {
                 if ($question->defaultmark == 0) {
@@ -186,7 +186,7 @@ class quiz_mcq_report extends quiz_default_report {
         // Get all users on this course who can attempt quizzes, and all attempts on this quiz
         $alluserscapable = get_users_by_capability($context,
 		    'mod/quiz:attempt', 'u.id, u.firstname, u.lastname', 'lastname ASC');
-		$allattempts = $DB->get_records_sql('SELECT * FROM {quiz_attempts} qa WHERE qa.quiz = ' . $quiz->id);
+	$allattempts = $DB->get_records_sql('SELECT * FROM {quiz_attempts} qa WHERE qa.quiz = ' . $quiz->id);
         $users = array();
         $attempts = array();
 
@@ -206,20 +206,20 @@ class quiz_mcq_report extends quiz_default_report {
                     }
 				}
             } else {
-			    // If not filtered by group, we still need to exclude users who cannot view this quiz.
+                // If not filtered by group, we still need to exclude users who cannot view this quiz.
                 // Start with 2D array of groups and groupings for this user. Array element 0 is always present
-				// and represents "whole course". If this element is empty then there are no groups for this user.
-				$usersgroups = groups_get_user_groups($course->id, $user->id);
+                // and represents "whole course". If this element is empty then there are no groups for this user.
+                $usersgroups = groups_get_user_groups($course->id, $user->id);
 
                 // If the quiz is restricted to group members only, then only include a user if: they are in
-				// a group, and they are in any grouping that has been specified.
+		// a group, and they are in any grouping that has been specified.
                 if ($cm->groupmembersonly) {
-				    if (!(empty($usersgroups[0]))
-					    and (array_key_exists($cm->groupingid, $usersgroups) or ($cm->groupingid == 0))) {
+                    if (!(empty($usersgroups[0]))
+                            and (array_key_exists($cm->groupingid, $usersgroups) or ($cm->groupingid == 0))) {
 
-					    $adduser = true;
-					} else {
-					    $adduser = false;
+                            $adduser = true;
+                    } else {
+                            $adduser = false;
                     }
                 } else {
                     $adduser = true;
@@ -356,7 +356,7 @@ class quiz_mcq_report extends quiz_default_report {
         for ($u = 0; $u < $noofuserattempts; $u++) {
 
             // Get user's record
-			$user = $DB->get_record('user', array('id' => $userattempts[$u]->userid));
+            $user = $DB->get_record('user', array('id' => $userattempts[$u]->userid));
 
             // Add user ID, last name and first name to this row
             $optiondatarow = array($user->id, $user->lastname, $user->firstname);
@@ -377,50 +377,73 @@ class quiz_mcq_report extends quiz_default_report {
             // Loop through questions
             foreach ($mcq_keys as $q) {
 
+                // Set a flag for True/False questions
+                $qtype = $DB->get_record('question', array('id'=>$mcqids[$q][0]), 'qtype');
+                $truefalse = ($qtype->qtype == 'truefalse' ? 1 : 0);
+                
                 // Get the user's attempt at this question
-    			$qattempt = $DB->get_record_select('question_attempts', 'questionusageid = '
-	    		    . $userattempts[$u]->uniqueid . ' AND questionid = ' . $mcqids[$q][0]);
+    		$qattempt = $DB->get_record_select('question_attempts', 'questionusageid = '
+                    . $userattempts[$u]->uniqueid . ' AND questionid = ' . $mcqids[$q][0]);
 
-      			// Get the answer ids in the order they were displayed in this attempt
-				$qattempt_order = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd, 
-				    {question_attempt_steps} qas WHERE qas.questionattemptid = ' . $qattempt->id
-					. ' AND qas.state = "todo" AND qasd.attemptstepid = qas.id AND qasd.name = "_order"');
+      		// Get the answer ids in the order they were displayed in this attempt
+		$qattempt_order = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd, 
+                    {question_attempt_steps} qas WHERE qas.questionattemptid = ' . $qattempt->id
+			. ' AND qas.state = "todo" AND qasd.attemptstepid = qas.id AND qasd.name = "_order"');
 
-      			// Get the index of the answer selected in this attempt (for single-answer MCQs)
-				$qattempt_answer = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd, 
-				    {question_attempt_steps} qas WHERE qas.questionattemptid = ' . $qattempt->id
-					. ' AND qas.state = "complete" AND qasd.attemptstepid = qas.id AND qasd.name = "answer"');	
+                // Get the attempt step corresponding to the final submitted answer
+		$qattempt_submit_step = $DB->get_record_sql('SELECT qas.id FROM {question_attempt_steps} qas'
+                        . ' WHERE qas.questionattemptid = ' . $qattempt->id
+			. ' AND qas.state = "complete" AND qas.sequencenumber ='
+                        . ' (SELECT max(qas2.sequencenumber) FROM {question_attempt_steps} qas2'
+                        . ' WHERE qas2.questionattemptid = qas.questionattemptid AND qas2.state = qas.state)');
 
-      			// Get the indices of the answers selected in this attempt (for multiple-answer MCQs)
-				$qattempt_choices = $DB->get_records_sql('SELECT qasd.name, qasd.value FROM {question_attempt_step_data} qasd, 
-				    {question_attempt_steps} qas WHERE qas.questionattemptid = ' . $qattempt->id
-					. ' AND qas.state = "complete" AND qasd.attemptstepid = qas.id AND qasd.name LIKE "choice%"');	
-
-                $optionids = explode(',', $qattempt_order->value);
+                // Get the index of the answer selected in this attempt (for single-answer MCQs)
+                // The value retrieved here represents the index of the chosen answer in the list $attempt_order->value
+                $qattempt_answer = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd'
+                        . ' WHERE qasd.attemptstepid = ' . $qattempt_submit_step->id . ' AND qasd.name = "answer"');
+                
+      		// Get the indices of the answers selected in this attempt (for multiple-answer MCQs)
+		$qattempt_choices = $DB->get_records_sql('SELECT qasd.name, qasd.value'
+                        . ' FROM {question_attempt_step_data} qasd'
+                        . ' WHERE qasd.attemptstepid = ' . $qattempt_submit_step->id
+                        . ' AND qasd.name LIKE "choice%"');
+                
+                // Change list of answer ids into array
+                if ($qattempt_order) {
+                    $optionids = explode(',', $qattempt_order->value);
+                }
+                
                 $optionschosen = array();
 
                 if ($qattempt_answer) {
-                    $optionschosen[] = $optionids[$qattempt_answer->value];
+                    if (!$qattempt_order) {
+                        // True/false question, no order provided, 'value' is Boolean
+                        $optionschosen[] = ($qattempt_answer->value == 1 ? 1 : 2);
+                    } else {
+                        // Convert response indices into answer ids
+                        $optionschosen[] = $optionids[$qattempt_answer->value];
+                    }
                 } elseif (count($qattempt_choices) > 0) {
-				    foreach ($qattempt_choices as $choice) {
-					    $idx = str_replace('choice', '', $choice->name);
-						if ($choice->value > 0) {
+                    // Multiple-answer question
+		    foreach ($qattempt_choices as $choice) {
+                        $idx = str_replace('choice', '', $choice->name);
+			if ($choice->value > 0) {
                             $optionschosen[] = $optionids[$idx];
-						}
+			}
                     }
                 } else {
-				    // If all else fails (because the quiz data is restored from backup so there is no step data),
-					// simply compare the response string with the answers in the database. Note we have to strip
-					// HTML and whitespace because question_answers and question_attempts store strings differently.
-        			$qanswers = $DB->get_records_select('question_answers', 'question = '
-	        		    . $mcqids[$q][0]);
-					$optionstrings = array_map("trim", explode('; ', $qattempt->responsesummary));
-					foreach ($qanswers as $qans) {
-					    if (in_array(trim(html_to_text($qans->answer)),$optionstrings)) {
-						    $optionschosen[] = $qans->id;
-						}
-					}
-				}
+                    // If all else fails (because the quiz data is restored from backup so there is no step data),
+                    // simply compare the response string with the answers in the database. Note we have to strip
+                    // HTML and whitespace because question_answers and question_attempts store strings differently.
+                    $qanswers = $DB->get_records_select('question_answers', 'question = '
+	        	. $mcqids[$q][0]);
+                    $optionstrings = array_map("trim", explode('; ', $qattempt->responsesummary));
+                    foreach ($qanswers as $qans) {
+                        if (in_array(trim(html_to_text($qans->answer)),$optionstrings)) {
+			    $optionschosen[] = $qans->id;
+			}
+                    }
+		}
 
                 // If any options were chosen, increment the question attempts counter
                 if (count($optionschosen) > 0) {
