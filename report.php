@@ -397,16 +397,22 @@ class quiz_mcq_report extends quiz_default_report {
                         . ' (SELECT max(qas2.sequencenumber) FROM {question_attempt_steps} qas2'
                         . ' WHERE qas2.questionattemptid = qas.questionattemptid AND qas2.state = qas.state)');
 
-                // Get the index of the answer selected in this attempt (for single-answer MCQs)
-                // The value retrieved here represents the index of the chosen answer in the list $attempt_order->value
-                $qattempt_answer = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd'
-                        . ' WHERE qasd.attemptstepid = ' . $qattempt_submit_step->id . ' AND qasd.name = "answer"');
-                
-      		// Get the indices of the answers selected in this attempt (for multiple-answer MCQs)
-		$qattempt_choices = $DB->get_records_sql('SELECT qasd.name, qasd.value'
-                        . ' FROM {question_attempt_step_data} qasd'
-                        . ' WHERE qasd.attemptstepid = ' . $qattempt_submit_step->id
-                        . ' AND qasd.name LIKE "choice%"');
+                if ($qattempt_submit_step) {
+                    // Get the index of the answer selected in this attempt (for single-answer MCQs)
+                    // The value retrieved here represents the index of the chosen answer in the list $attempt_order->value
+                    $qattempt_answer = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd'
+                            . ' WHERE qasd.attemptstepid = ' . $qattempt_submit_step->id . ' AND qasd.name = "answer"');
+
+                    // Get the indices of the answers selected in this attempt (for multiple-answer MCQs)
+                    $qattempt_choices = $DB->get_records_sql('SELECT qasd.name, qasd.value'
+                            . ' FROM {question_attempt_step_data} qasd'
+                            . ' WHERE qasd.attemptstepid = ' . $qattempt_submit_step->id
+                            . ' AND qasd.name LIKE "choice%"');
+                } else {
+                    // Unanswered
+                    $qattempt_answer = false;
+                    $qattempt_choices = array();
+                }
                 
                 // Change list of answer ids into array
                 if ($qattempt_order) {
