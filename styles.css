@@ -66,6 +66,7 @@ table.mcq td.correct {
 
 table.mcq.print td.correct {
   background-color: #808080 !important;
+  background-image: url([[pix:quiz_mcq|shade_808080]]);
   font-weight: bold;
 }
 
@@ -75,6 +76,7 @@ table.mcq td.partial {
 
 table.mcq.print td.partial {
   background-color: #EEEEEE !important;
+  background-image: url([[pix:quiz_mcq|shade_EEEEEE]]);
 }
 
 table.mcq td.unanswered {
@@ -83,6 +85,8 @@ table.mcq td.unanswered {
 
 table.mcq.print td.unanswered {
   background-color: #B6B6B6 !important;
+  background-image: url([[pix:quiz_mcq|shade_B6B6B6]]);
+
 }
 
 table.mcq.keytable.print td.subheading {
