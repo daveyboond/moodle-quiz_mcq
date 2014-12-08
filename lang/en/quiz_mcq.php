@@ -1,5 +1,4 @@
-<?php // $Id: quiz_mcq.php,v 1.0 2010-06-23 sbond $ 
-
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -71,6 +70,3 @@ $string['warningnomcq'] = 'There are no (non-random) multiple choice questions i
 $string['warningnotallmcq'] = 'Only the multiple choice questions in this quiz are displayed below. However, the grades shown include one or more questions of other types that are used in this quiz.';
 $string['wholecourse'] = 'Whole course';
 $string['wholegrouping'] = 'Whole grouping';
-
-?>
-            
