@@ -119,23 +119,13 @@ class quiz_mcq_report extends quiz_default_report {
         // Get maximum grade possible
         $maxposs = $quiz->grade;
 
-        // Get question IDs for this quiz. Convert from the stored format (comma-separated string, with
-        // zeroes for page breaks). Question order is that in which they are ordered in the quiz by the editor.
-        $questionstring = quiz_questions_in_quiz($quiz->questions);
-        $allquestionids = explode(',', $questionstring);
-
-        // Remove any description 'questions' from the list as these should not be counted in the numbering
+        // *Updated for Moodle 2.7* Get question IDs for this quiz. Use the reportlib function
+        // quiz_report_get_significant_questions to exclude description questions.
+        // Question order is slot order (that in which they are ordered in the quiz by the editor).
         $allrealquestionids = array();
-        foreach ($allquestionids as $qid) {
-            $question = $DB->get_record_sql('
-                SELECT q.*, qc.contextid
-                FROM {question} q
-                JOIN {question_categories} qc ON qc.id = q.category
-                WHERE q.id = ?', array($qid)); // Code fragment pinched from question_delete_question in questionlib.php
-
-            if ($question->qtype != 'description') {
-                array_push($allrealquestionids, $qid);
-            }
+        $quizquestions = quiz_report_get_significant_questions($quiz);
+        foreach ($quizquestions as $quizquestion) {
+            $allrealquestionids[] = $quizquestion->id;
         }
 
         // Create an array of the multiple choice questions only, together with a flag to indicate
