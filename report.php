@@ -173,10 +173,11 @@ class quiz_mcq_report extends quiz_default_report {
         // other student-type roles such as "auditing student" (used at LSE)
         $regusers = get_role_users(5, $context, true);
 
-        // Get all users on this course who can attempt quizzes, and all attempts on this quiz
+        // Get all users on this course who can attempt quizzes, and all completed attempts on this quiz
         $alluserscapable = get_users_by_capability($context,
             'mod/quiz:attempt', 'u.id, u.firstname, u.lastname', 'lastname ASC');
-        $allattempts = $DB->get_records_sql('SELECT * FROM {quiz_attempts} qa WHERE qa.quiz = ' . $quiz->id);
+        $allattempts = $DB->get_records_sql('SELECT * FROM {quiz_attempts} qa WHERE qa.state = "finished" '
+            . 'AND qa.quiz = ' . $quiz->id);
         $users = array();
         $attempts = array();
 
