@@ -24,26 +24,25 @@
  */
 
 /**
-Variables reference:
-$allattempts - all attempts on this quiz
-$alluserscapable - array of user objects for users who can attempt quizzes
-$attempts - attempts on quiz belonging to eligible users (after filtering)
-$grades - array of total grade for the quiz for each user
-$groupids - group IDs passed as parameters (0 = whole cohort/grouping)
-$maxoptions - maximum number of options in any one question
-$noofuserattempts - count of the $userattempts array
-$noofuserscorrect - array of number of users getting each question correct
-$optioncounts - array of counts of users choosing each option
-$optiondata - array of arrays for each user, containing user details and what options they chose in each question
-$options - array of objects (with id and fraction properties) representing each option (answer) for each question
-$regusers - array of user objects for all users in course with role Student
-$uncompletedusers - array of user objects for users who have not completed an attempt
-$userattemptidlist - comma-separated list of all attempt IDs selected
-$userattempts - array of most-relevant attempts, by user ID
-$users - array of user objects for users who are in current sample
-$usersgroups - 2D array of groups and groupings for given user/course
-$warnings - array of warning messages generated when selecting which attempts to use
-
+ * Variables reference:
+ * $allattempts - all attempts on this quiz
+ * $alluserscapable - array of user objects for users who can attempt quizzes
+ * $attempts - attempts on quiz belonging to eligible users (after filtering)
+ * $grades - array of total grade for the quiz for each user
+ * $groupids - group IDs passed as parameters (0 = whole cohort/grouping)
+ * $maxoptions - maximum number of options in any one question
+ * $noofuserattempts - count of the $userattempts array
+ * $noofuserscorrect - array of number of users getting each question correct
+ * $optioncounts - array of counts of users choosing each option
+ * $optiondata - array of arrays for each user, containing user details and what options they chose in each question
+ * $options - array of objects (with id and fraction properties) representing each option (answer) for each question
+ * $regusers - array of user objects for all users in course with role Student
+ * $uncompletedusers - array of user objects for users who have not completed an attempt
+ * $userattemptidlist - comma-separated list of all attempt IDs selected
+ * $userattempts - array of most-relevant attempts, by user ID
+ * $users - array of user objects for users who are in current sample
+ * $usersgroups - 2D array of groups and groupings for given user/course
+ * $warnings - array of warning messages generated when selecting which attempts to use
  */
 
 defined('MOODLE_INTERNAL') || die();
@@ -64,22 +63,27 @@ class quiz_mcq_report extends quiz_default_report {
         $sort = optional_param('sort', 1, PARAM_INT);
         $highlightcorrect = optional_param('highlightcorrect', 1, PARAM_INT);
         $print = optional_param('print', 0, PARAM_INT);
-		
+
+        // Set appropriate page layout if necessary
+        if ($print == 1) {
+            $PAGE->set_pagelayout('base');
+        }
+
         // Get context
-        $context = get_context_instance(CONTEXT_MODULE, $cm->id);
+        $context = context_module::instance($cm->id);
         $reporturl = $CFG->wwwroot.'/mod/quiz/report.php';
 
         // Start output.
         $this->print_header_and_tabs($cm, $course, $quiz, 'mcq');
 
         // Get list of groups applicable to this quiz. Use 0 as the ID for the whole course/whole grouping option.
-		// Start the group name arrays.
+        // Start the group name arrays.
         $groupnames = array();
         if ($cm->groupingid > 0) {
-			$groups = groups_get_all_groups($course->id, 0, $cm->groupingid);
+            $groups = groups_get_all_groups($course->id, 0, $cm->groupingid);
             array_push($groupnames, array(0, get_string('wholegrouping', 'quiz_mcq')));
         } else {
-			$groups = groups_get_all_groups($course->id);
+            $groups = groups_get_all_groups($course->id);
             array_push($groupnames, array(0, get_string('wholecourse', 'quiz_mcq')));
         }
 
@@ -89,25 +93,25 @@ class quiz_mcq_report extends quiz_default_report {
         }
 
         // Remove the first element, sort by name, then put the first element back.
-		// Using the 'lastname_cmp' comparison to sort on the [1] column of $groupnames
+        // Using the 'lastname_cmp' comparison to sort on the [1] column of $groupnames
         $whole = array_shift($groupnames);
         usort($groupnames, array($this, 'lastname_cmp'));
         array_unshift($groupnames, $whole);
-		
-		// If no group IDs were passed as a parameter, set the default group ID to be the first group,
-		//  if there is one. This saves us always having to display data for the whole cohort, which
-		//  may be very large.
-		if (count($groupids) == 0) {
+
+        // If no group IDs were passed as a parameter, set the default group ID to be the first group,
+        //  if there is one. This saves us always having to display data for the whole cohort, which
+        //  may be very large.
+        if (count($groupids) == 0) {
             if (count($groups) > 0) {
-				$allgroupids = array_keys($groups);
-		        $groupids[] = $allgroupids[0];
-			} else {
-		        $groupids[] = 0;
-			}
-		}
+                $allgroupids = array_keys($groups);
+                $groupids[] = $allgroupids[0];
+            } else {
+                $groupids[] = 0;
+            }
+        }
 
         // Create list of filters. Filter 1 has been removed as the report now only includes users who
-		// can attempt quiz (i.e. no Teachers)
+        // can attempt quiz (i.e. no Teachers)
         $filternames = array();
         array_push($filternames, array(0, get_string('allusers', 'quiz_mcq')));
         array_push($filternames, array(2, get_string('regstudents', 'quiz_mcq')));
@@ -115,56 +119,45 @@ class quiz_mcq_report extends quiz_default_report {
         // Get maximum grade possible
         $maxposs = $quiz->grade;
 
-        // Get question IDs for this quiz. Convert from the stored format (comma-separated string, with
-		// zeroes for page breaks). Question order is that in which they are ordered in the quiz by the editor.
-        $questionstring = quiz_questions_in_quiz($quiz->questions);
-        $allquestionids = explode(',', $questionstring);
-		
-
-        // Remove any description 'questions' from the list as these should not be counted in the numbering
+        // *Updated for Moodle 2.7* Get question IDs for this quiz. Use the reportlib function
+        // quiz_report_get_significant_questions to exclude description questions.
+        // Question order is slot order (that in which they are ordered in the quiz by the editor).
         $allrealquestionids = array();
-        foreach ($allquestionids as $qid) {
-            $question = $DB->get_record_sql('
-                SELECT q.*, qc.contextid
-                FROM {question} q
-                JOIN {question_categories} qc ON qc.id = q.category
-                WHERE q.id = ?', array($qid)); // Code fragment pinched from question_delete_question in questionlib.php
-
-			if ($question->qtype != 'description') {
-                array_push($allrealquestionids, $qid);
-            }
+        $quizquestions = quiz_report_get_significant_questions($quiz);
+        foreach ($quizquestions as $quizquestion) {
+            $allrealquestionids[] = $quizquestion->id;
         }
 
         // Create an array of the multiple choice questions only, together with a flag to indicate
-		// single-answer questions in the original question order. Create a comma-separated list of the IDs.
+        // single-answer questions in the original question order. Create a comma-separated list of the IDs.
         $mcqids = array();
         $mcqidlist = '';
         $noofungradedquestions = 0;
         for ($q = 0; $q < count($allrealquestionids); $q++) {
 
-			$question = $DB->get_record_sql('
+            $question = $DB->get_record_sql('
                 SELECT q.*, qc.contextid
                 FROM {question} q
                 JOIN {question_categories} qc ON qc.id = q.category
                 WHERE q.id = ?', array($allrealquestionids[$q]));
-        
+
             // Is this a single-answer question?
-            $single = $DB->get_record('question_multichoice',
-			    array('question' => $allrealquestionids[$q]), 'single');
-		
+            $single = $DB->get_record('qtype_multichoice_options',
+                array('questionid' => $allrealquestionids[$q]), 'single');
+
             if ($question->qtype == 'multichoice' or $question->qtype == 'truefalse') {
-			    $mcqids[$q] = array($allrealquestionids[$q], $single->single);
+                $mcqids[$q] = array($allrealquestionids[$q], $single->single);
                 $mcqidlist .= $allrealquestionids[$q] . ',';
             } else {
                 if ($question->defaultmark == 0) {
                     // Count the ungraded, non-MCQ questions
                     $noofungradedquestions++;
                 }
-            }            
+            }
         }
         $noofmcqs = count($mcqids);
         $mcqidlist = trim($mcqidlist, ',');
-		$mcq_keys = array_keys($mcqids); // Just to save calling this function every time we need to loop
+        $mcqkeys = array_keys($mcqids); // Just to save calling this function every time we need to loop
 
         // Check number of MCQs and set warnings
         $warnings = array();
@@ -177,13 +170,14 @@ class quiz_mcq_report extends quiz_default_report {
         }
 
         // Get IDs for registered students, i.e. those with the "Student" role [roleid = 5], as opposed to
-		// other student-type roles such as "auditing student" (used at LSE)
+        // other student-type roles such as "auditing student" (used at LSE)
         $regusers = get_role_users(5, $context, true);
 
-        // Get all users on this course who can attempt quizzes, and all attempts on this quiz
+        // Get all users on this course who can attempt quizzes, and all completed attempts on this quiz
         $alluserscapable = get_users_by_capability($context,
-		    'mod/quiz:attempt', 'u.id, u.firstname, u.lastname', 'lastname ASC');
-		$allattempts = $DB->get_records_sql('SELECT * FROM {quiz_attempts} qa WHERE qa.quiz = ' . $quiz->id);
+            'mod/quiz:attempt', 'u.id, u.firstname, u.lastname', 'lastname ASC');
+        $allattempts = $DB->get_records_sql('SELECT * FROM {quiz_attempts} qa WHERE qa.state = "finished" '
+            . 'AND qa.quiz = ' . $quiz->id);
         $users = array();
         $attempts = array();
 
@@ -194,56 +188,56 @@ class quiz_mcq_report extends quiz_default_report {
             $adduser = true;
 
             // If filtered by group, only include users from selected groups. ($groupids contains 0 if
-			// the "whole course" filter was selected, or if no group was passed and there are no groups set up.)
+            // the "whole course" filter was selected, or if no group was passed and there are no groups set up.)
             if (!in_array(0, $groupids)) {
-			    $adduser = false;
-			    foreach ($groupids as $gid) {
-				    if (groups_is_member($gid, $user->id)) {
+                $adduser = false;
+                foreach ($groupids as $gid) {
+                    if (groups_is_member($gid, $user->id)) {
                         $adduser = true;
                     }
-				}
+                }
             } else {
-			    // If not filtered by group, we still need to exclude users who cannot view this quiz.
+                // If not filtered by group, we still need to exclude users who cannot view this quiz.
                 // Start with 2D array of groups and groupings for this user. Array element 0 is always present
-				// and represents "whole course". If this element is empty then there are no groups for this user.
-				$usersgroups = groups_get_user_groups($course->id, $user->id);
+                // and represents "whole course". If this element is empty then there are no groups for this user.
+                $usersgroups = groups_get_user_groups($course->id, $user->id);
 
                 // If the quiz is restricted to group members only, then only include a user if: they are in
-				// a group, and they are in any grouping that has been specified.
+                // a group, and they are in any grouping that has been specified.
                 if ($cm->groupmembersonly) {
-				    if (!(empty($usersgroups[0]))
-					    and (array_key_exists($cm->groupingid, $usersgroups) or ($cm->groupingid == 0))) {
+                    if (!(empty($usersgroups[0]))
+                        and (array_key_exists($cm->groupingid, $usersgroups) or ($cm->groupingid == 0))) {
 
-					    $adduser = true;
-					} else {
-					    $adduser = false;
+                        $adduser = true;
+                    } else {
+                        $adduser = false;
                     }
                 } else {
                     $adduser = true;
                 }
-				
+
             }
 
             // Final filter to control for user role. (Note the $filter == 1 "all students" option is removed, as
-			// we now select only those users who can attempt the quiz i.e. no teacher previews included).
+            // we now select only those users who can attempt the quiz i.e. no teacher previews included).
             if ($filter == 2) {
                 // If registered students filter is on, remove users without registered student role
-                if (!in_array($user -> id, array_keys($regusers))) {
+                if (!in_array($user->id, array_keys($regusers))) {
                     $adduser = false;
                 }
             }
-            
+
             // Add user if eligible
             if ($adduser) {
                 array_push($users, $user);
             }
- 
+
         }
 
         // Extract the quiz attempts belonging to the eligible users
         foreach ($allattempts as $attempt) {
             foreach ($users as $user) {
-                if ($attempt -> userid == $user -> id) {
+                if ($attempt->userid == $user->id) {
                     array_push($attempts, $attempt);
                 }
             }
@@ -265,7 +259,7 @@ class quiz_mcq_report extends quiz_default_report {
                 }
                 break;
             case 3:
-                // First attempt: Use first attempt 
+                // First attempt: Use first attempt
                 foreach ($attempts as $attempt) {
                     $userid = $attempt->userid;
                     if ($attempt->attempt == 1) {
@@ -278,7 +272,7 @@ class quiz_mcq_report extends quiz_default_report {
                 // Average grade: Set warning and carry on to use last attempt
                 $warnings[] = get_string('warningaverage', 'quiz_mcq');
             case 4:
-                // Last attempt: Use last attempt 
+                // Last attempt: Use last attempt
                 foreach ($attempts as $attempt) {
                     $userid = $attempt->userid;
                     if (empty($userattempts[$userid]) or $attempt->attempt > $userattempts[$userid]->attempt) {
@@ -286,7 +280,7 @@ class quiz_mcq_report extends quiz_default_report {
                         $userattemptidlist .= $attempt->uniqueid . ',';
                     }
                 }
-                break;
+            break;
         }
 
         $userattemptidlist = trim($userattemptidlist, ',');
@@ -297,7 +291,7 @@ class quiz_mcq_report extends quiz_default_report {
             // Initially assume user has not completed (seems clumsy but it is the best way I think)
             array_push($uncompletedusers, $user);
             foreach ($userattempts as $userattempt) {
-                if ($userattempt -> userid == $user -> id) {
+                if ($userattempt->userid == $user->id) {
                     // If an attempt is found remove the user, and jump to next one
                     array_pop($uncompletedusers);
                     break;
@@ -312,11 +306,11 @@ class quiz_mcq_report extends quiz_default_report {
         $maxoptions = 0;
         $fullycorrect = array();
         $anycorrect = array();
-        foreach ($mcq_keys as $q) {
+        foreach ($mcqkeys as $q) {
 
-            // get_records_sql returns an array with IDs as keys, but we need a zero-based array so use array_values
-			$options[$q] = array_values($DB->get_records_sql('SELECT id, fraction FROM {question_answers} qans '
-			    . 'WHERE qans.question = ' . $mcqids[$q][0] . ' ORDER BY id ASC'));
+            // Function get_records_sql returns an array with IDs as keys, but we need a zero-based array so use array_values
+            $options[$q] = array_values($DB->get_records_sql('SELECT id, fraction FROM {question_answers} qans '
+                . 'WHERE qans.question = ' . $mcqids[$q][0] . ' ORDER BY id ASC'));
 
             // Set up the option counts array with zeroes
             $optioncounts[$q] = array_fill(0, count($options[$q]) + 1, 0);
@@ -325,18 +319,18 @@ class quiz_mcq_report extends quiz_default_report {
             $maxoptions = max($maxoptions, count($options[$q]));
 
             // Also create arrays of correct options (represented by unshuffled indices). The "fullycorrect" option list
-			// contains those worth 100%. The "anycorrect" options are those worth > 0%.
+            // contains those worth 100%. The "anycorrect" options are those worth > 0%.
             $fullycorrect[$q] = array();
             $anycorrect[$q] = array();
             for ($opt = 0; $opt < count($options[$q]); $opt++) {
                 if ($options[$q][$opt]->fraction > 0) {
                     array_push($anycorrect[$q], ($opt + 1));
                     if ($options[$q][$opt]->fraction == 1) {
-					    array_push($fullycorrect[$q], ($opt + 1));
-	    			}
+                        array_push($fullycorrect[$q], ($opt + 1));
+                    }
                 }
             }
-			
+
         }
 
         // Make the attempts array zero-based array ($userattempts uses user IDs as keys,
@@ -348,82 +342,111 @@ class quiz_mcq_report extends quiz_default_report {
         // Loop through user attempts and get names and grades, then loop through questions and get option(s) chosen
         $optiondata = array();
         $grades = array();
-        $noofuserscorrect = array_fill_keys($mcq_keys, 0);
+        $noofuserscorrect = array_fill_keys($mcqkeys, 0);
 
         for ($u = 0; $u < $noofuserattempts; $u++) {
 
             // Get user's record
-			$user = $DB->get_record('user', array('id' => $userattempts[$u]->userid));
+            $user = $DB->get_record('user', array('id' => $userattempts[$u]->userid));
 
             // Add user ID, last name and first name to this row
             $optiondatarow = array($user->id, $user->lastname, $user->firstname);
-			
+
             // Calculate grade achieved and add it to this row and to grades array. Grades are stored as a
-			// proportion of the sumgrades values (i.e. the sum of question weights in the quiz, which is
-			// then scaled up to give the actual grade)
+            // proportion of the sumgrades values (i.e. the sum of question weights in the quiz, which is
+            // then scaled up to give the actual grade)
             $grade = round($quiz->grade * $userattempts[$u]->sumgrades / $quiz->sumgrades, $quiz->decimalpoints);
             array_push($grades, $grade);
             array_push($optiondatarow, $grade);
 
             // Create an array item for the number of questions attempted in this quiz, to be populated later
-            $noof_qattempts = 0;
-            array_push($optiondatarow, $noof_qattempts);
+            $noofqattempts = 0;
+            array_push($optiondatarow, $noofqattempts);
 
             // All changed in Moodle 2 from here. No more use of question_states table.
-			
+
             // Loop through questions
-            foreach ($mcq_keys as $q) {
+            foreach ($mcqkeys as $q) {
+
+                // Set a flag for True/False questions
+                $qtype = $DB->get_record('question', array('id' => $mcqids[$q][0]), 'qtype');
+                $truefalse = ($qtype->qtype == 'truefalse' ? 1 : 0);
 
                 // Get the user's attempt at this question
-    			$qattempt = $DB->get_record_select('question_attempts', 'questionusageid = '
-	    		    . $userattempts[$u]->uniqueid . ' AND questionid = ' . $mcqids[$q][0]);
+                $qattempt = $DB->get_record_select('question_attempts', 'questionusageid = '
+                    . $userattempts[$u]->uniqueid . ' AND questionid = ' . $mcqids[$q][0]);
 
-      			// Get the answer ids in the order they were displayed in this attempt
-				$qattempt_order = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd, 
-				    {question_attempt_steps} qas WHERE qas.questionattemptid = ' . $qattempt->id
-					. ' AND qas.state = "todo" AND qasd.attemptstepid = qas.id AND qasd.name = "_order"');
+                // Get the answer ids in the order they were displayed in this attempt
+                $qattemptorder = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd,
+                    {question_attempt_steps} qas WHERE qas.questionattemptid = ' . $qattempt->id
+                        . ' AND qas.state = "todo" AND qasd.attemptstepid = qas.id AND qasd.name = "_order"');
 
-      			// Get the index of the answer selected in this attempt (for single-answer MCQs)
-				$qattempt_answer = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd, 
-				    {question_attempt_steps} qas WHERE qas.questionattemptid = ' . $qattempt->id
-					. ' AND qas.state = "complete" AND qasd.attemptstepid = qas.id AND qasd.name = "answer"');	
+                // Get the attempt step corresponding to the final submitted answer
+                $qattemptsubmitstep = $DB->get_record_sql('SELECT qas.id FROM {question_attempt_steps} qas'
+                    . ' WHERE qas.questionattemptid = ' . $qattempt->id
+                    . ' AND qas.state = "complete" AND qas.sequencenumber ='
+                    . ' (SELECT max(qas2.sequencenumber) FROM {question_attempt_steps} qas2'
+                    . ' WHERE qas2.questionattemptid = qas.questionattemptid AND qas2.state = qas.state)');
 
-      			// Get the indices of the answers selected in this attempt (for multiple-answer MCQs)
-				$qattempt_choices = $DB->get_records_sql('SELECT qasd.name, qasd.value FROM {question_attempt_step_data} qasd, 
-				    {question_attempt_steps} qas WHERE qas.questionattemptid = ' . $qattempt->id
-					. ' AND qas.state = "complete" AND qasd.attemptstepid = qas.id AND qasd.name LIKE "choice%"');	
+                if ($qattemptsubmitstep) {
+                    // Get the index of the answer selected in this attempt (for single-answer MCQs)
+                    // The value retrieved here represents the index of the chosen answer in the list $attempt_order->value
+                    $qattemptanswer = $DB->get_record_sql('SELECT qasd.value FROM {question_attempt_step_data} qasd'
+                        . ' WHERE qasd.attemptstepid = ' . $qattemptsubmitstep->id . ' AND qasd.name = "answer"');
 
-                $optionids = explode(',', $qattempt_order->value);
+                    // Get the indices of the answers selected in this attempt (for multiple-answer MCQs)
+                    $qattemptchoices = $DB->get_records_sql('SELECT qasd.name, qasd.value'
+                        . ' FROM {question_attempt_step_data} qasd'
+                        . ' WHERE qasd.attemptstepid = ' . $qattemptsubmitstep->id
+                        . ' AND qasd.name LIKE "choice%"');
+                } else {
+                    // Unanswered
+                    $qattemptanswer = false;
+                    $qattemptchoices = array();
+                }
+
+                // Change list of answer ids into array
+                if ($qattemptorder) {
+                    $optionids = explode(',', $qattemptorder->value);
+                }
+
                 $optionschosen = array();
 
-                if ($qattempt_answer) {
-                    $optionschosen[] = $optionids[$qattempt_answer->value];
-                } elseif (count($qattempt_choices) > 0) {
-				    foreach ($qattempt_choices as $choice) {
-					    $idx = str_replace('choice', '', $choice->name);
-						if ($choice->value > 0) {
+                if ($qattemptanswer) {
+                    if (!$qattemptorder) {
+                        // True/false question, no order provided, 'value' is Boolean
+                        $optionschosen[] = ($qattemptanswer->value == 1 ? 1 : 2);
+                    } else {
+                        // Convert response indices into answer ids
+                        $optionschosen[] = $optionids[$qattemptanswer->value];
+                    }
+                } else if (count($qattemptchoices) > 0) {
+                    // Multiple-answer question
+                    foreach ($qattemptchoices as $choice) {
+                        $idx = str_replace('choice', '', $choice->name);
+                        if ($choice->value > 0) {
                             $optionschosen[] = $optionids[$idx];
-						}
+                        }
                     }
                 } else {
-				    // If all else fails (because the quiz data is restored from backup so there is no step data),
-					// simply compare the response string with the answers in the database. Note we have to strip
-					// HTML and whitespace because question_answers and question_attempts store strings differently.
-        			$qanswers = $DB->get_records_select('question_answers', 'question = '
-	        		    . $mcqids[$q][0]);
-					$optionstrings = array_map("trim", explode('; ', $qattempt->responsesummary));
-					foreach ($qanswers as $qans) {
-					    if (in_array(trim(html_to_text($qans->answer)),$optionstrings)) {
-						    $optionschosen[] = $qans->id;
-						}
-					}
-				}
+                    // If all else fails (because the quiz data is restored from backup so there is no step data),
+                    // simply compare the response string with the answers in the database. Note we have to strip
+                    // HTML and whitespace because question_answers and question_attempts store strings differently.
+                    $qanswers = $DB->get_records_select('question_answers', 'question = '
+                        . $mcqids[$q][0]);
+                    $optionstrings = array_map("trim", explode('; ', $qattempt->responsesummary));
+                    foreach ($qanswers as $qans) {
+                        if (in_array(trim(html_to_text($qans->answer)), $optionstrings)) {
+                            $optionschosen[] = $qans->id;
+                        }
+                    }
+                }
 
                 // If any options were chosen, increment the question attempts counter
                 if (count($optionschosen) > 0) {
-                    $noof_qattempts++;
+                    $noofqattempts++;
                 }
-				
+
                 // Important: the options may be shuffled for the student. We need to represent the options chosen
                 // according to their *unshuffled* order if the results are to be comparable between students. The
                 // unshuffled order is that in which they are listed when editing the question, and is given by the
@@ -440,7 +463,7 @@ class quiz_mcq_report extends quiz_default_report {
 
                 // Sort the chosen option indices
                 sort($optionschosen);
-            
+
                 // If user chose no options, increment zeroth element of optioncounts and increment the
                 // non-choosers counter. Otherwise loop through the options chosen and increment each
                 // corresponding element in optioncounts
@@ -453,29 +476,29 @@ class quiz_mcq_report extends quiz_default_report {
                 }
 
                 // Check if the array of options chosen matches the correct answer.
-				// If so, increment the correct counter for this question. Add a flag to
-				// the end of the string to indicate correctness (0 = wrong, 1 = correct, 2= partially correct).
-				// Finally add it to the data row for this user.
+                // If so, increment the correct counter for this question. Add a flag to
+                // the end of the string to indicate correctness (0 = wrong, 1 = correct, 2= partially correct).
+                // Finally add it to the data row for this user.
                 $flag = 0;
                 if ($mcqids[$q][1] == 1) {
-				    // Single-answer question correct if one or more 100% answers chosen, partially correct if
-					// one or more > 0 answers chosen
-					if(count(array_intersect($optionschosen, $fullycorrect[$q])) > 0) {
-					    $flag = 1;
+                    // Single-answer question correct if one or more 100% answers chosen, partially correct if
+                    // one or more > 0 answers chosen
+                    if (count(array_intersect($optionschosen, $fullycorrect[$q])) > 0) {
+                        $flag = 1;
                         $noofuserscorrect[$q]++;
-					} else if (count(array_intersect($optionschosen, $anycorrect[$q])) > 0) {
-					    $flag = 2;
-					}
-				} else {
-				    // Multiple-answer question correct if all > 0 answers chosen, partially correct if one or
-					// more > 0 answers chosen
+                    } else if (count(array_intersect($optionschosen, $anycorrect[$q])) > 0) {
+                        $flag = 2;
+                    }
+                } else {
+                    // Multiple-answer question correct if all > 0 answers chosen, partially correct if one or
+                    // more > 0 answers chosen
                     if ($optionschosen == $anycorrect[$q]) {
-					    $flag = 1;
+                        $flag = 1;
                         $noofuserscorrect[$q]++;
-					} else if (count(array_intersect($optionschosen, $anycorrect[$q])) > 0) {
-					    $flag = 2;
-					}
-				}
+                    } else if (count(array_intersect($optionschosen, $anycorrect[$q])) > 0) {
+                        $flag = 2;
+                    }
+                }
 
                 // Convert the options chosen into a string (this may prove unnecessary...), and add the flag on the end
                 $optionschosenlist = implode(',', $optionschosen);
@@ -485,7 +508,7 @@ class quiz_mcq_report extends quiz_default_report {
             }
 
             // Update the question attempts counter with the correct number
-            $optiondatarow[4] = $noof_qattempts;
+            $optiondatarow[4] = $noofqattempts;
 
             // Row is complete, so add it to the user data array
             array_push($optiondata, $optiondatarow);
@@ -526,7 +549,6 @@ class quiz_mcq_report extends quiz_default_report {
                 // Sort by lastname desc
                 usort($optiondata, array($this, 'lastname_cmp'));
                 $optiondata = array_reverse($optiondata);
-                break;
             case -2:
                 // Sort by firstname desc
                 usort($optiondata, array($this, 'firstname_cmp'));
@@ -543,50 +565,54 @@ class quiz_mcq_report extends quiz_default_report {
 
         // Sort the grades, calculate max, mean and median
         sort($grades, SORT_NUMERIC);
-		if ($noofuserattempts > 0) {
+        if ($noofuserattempts > 0) {
             $maxgrade = $grades[$noofuserattempts - 1];
-			$mean = round(array_sum($grades) / $noofuserattempts, 1);
+            $mean = round(array_sum($grades) / $noofuserattempts, 1);
             if ($noofuserattempts % 2) {
-                $median = $grades[floor($noofuserattempts/2)];
+                $median = $grades[floor($noofuserattempts / 2)];
             } else {
-                $median = round(($grades[$noofuserattempts/2] + $grades[$noofuserattempts/2 - 1]) / 2, 1);
+                $median = round(($grades[$noofuserattempts / 2] + $grades[$noofuserattempts / 2 - 1]) / 2, 1);
             }
-		} else {
+        } else {
             $maxgrade = 0;
-			$mean = 0;
-			$median = 0;
-		}
+            $mean = 0;
+            $median = 0;
+        }
 
         // Output
         if ($print == 1) {
             $this->output_print($warnings, $nodata, $quiz, $reporturl, $groupnames, $filternames, $noofuserattempts,
                 $uncompletedusers, $maxposs, $maxgrade, $median, $mean, $highlightcorrect, $noofmcqs,
                 $sortarg1, $sortarg2, $sortarg3, $sortarg4, $fullycorrect, $anycorrect, $noofuserscorrect, $optioncounts,
-                $optiondata, $mcqids, $maxoptions, $groupids, $filter);        
+                $optiondata, $mcqids, $maxoptions, $groupids, $filter);
         } else {
             $this->output_screen($warnings, $nodata, $quiz, $reporturl, $groupnames, $filternames, $noofuserattempts,
                 $uncompletedusers, $maxposs, $maxgrade, $median, $mean, $highlightcorrect, $noofmcqs,
                 $sortarg1, $sortarg2, $sortarg3, $sortarg4, $fullycorrect, $anycorrect, $noofuserscorrect, $optioncounts,
                 $optiondata, $mcqids, $maxoptions, $groupids, $filter);
         }
-			
+
         return true;
     }
 
 
     // Output for screen
-    function output_screen ($warnings, $nodata, $quiz, $reporturl, $groupnames, $filternames, $noofuserattempts,
+    protected function output_screen ($warnings, $nodata, $quiz, $reporturl, $groupnames, $filternames, $noofuserattempts,
             $uncompletedusers, $maxposs, $maxgrade, $median, $mean, $highlightcorrect, $noofmcqs,
             $sortarg1, $sortarg2, $sortarg3, $sortarg4, $fullycorrect, $anycorrect, $noofuserscorrect, $optioncounts,
             $optiondata, $mcqids, $maxoptions, $groupids, $filter) {
 
-        $mcq_keys = array_keys($mcqids); // Reassign since we didn't pass it
+        $mcqkeys = array_keys($mcqids); // Reassign since we didn't pass it
 
         // Calculate some local values
         $noofuncompletedusers = count($uncompletedusers);
         $noofusers = $noofuserattempts + $noofuncompletedusers;
-		if ($noofusers == 0) { $noofusers = 1; } // Avoid division by zero later on
-    
+
+        // Avoid division by zero later on
+        if ($noofusers == 0) {
+            $noofusers = 1;
+        }
+
         // Output: Warnings, if any
         while (count($warnings) > 0) {
             echo '<p class="mcq warningcell"><span class="warningheader">' . get_string('warning', 'quiz_mcq')
@@ -604,9 +630,9 @@ class quiz_mcq_report extends quiz_default_report {
         foreach ($groupids as $gid) {
             $groupidshttp .= "&groupid[]=$gid";
         }
-        
+
         echo '<table width="100%"><tr><td class="mcq date"><span class="mcq subheading">'
-	    . get_string('quizcloses', 'quiz_mcq') . ':</span> ' . $quizclose . '</td>'
+            . get_string('quizcloses', 'quiz_mcq') . ':</span> ' . $quizclose . '</td>'
             . '<td align="right"><a href="' . qualified_me()
             . '&print=1' . $groupidshttp . '" target="_blank">'
             . get_string('printview', 'quiz_mcq') . '</a></td></tr></table>';
@@ -631,7 +657,7 @@ class quiz_mcq_report extends quiz_default_report {
         }
         echo '</select><br />';
         echo '</td><td valign="top">';
-        
+
         // Output: Filter drop-down
         echo '<select name="filter" onchange="document.forms[\'controlform\'].submit();">';
         foreach ($filternames as $filtername) {
@@ -647,12 +673,12 @@ class quiz_mcq_report extends quiz_default_report {
 
         // Output: Sample summary table.
         echo '<p class="mcq subheading">' . get_string('samplesummary', 'quiz_mcq') . ':</p>';
-        
+
         echo '<table id="summary" class="generaltable mcq summarytable">';
         echo '<tbody>';
         echo '<tr>';
         echo '<td>' . get_string('userscompleting', 'quiz_mcq') . '</td>';
-        echo '<td><div align="right">' . $noofuserattempts . ' (' . round(100 * $noofuserattempts / $noofusers) 
+        echo '<td><div align="right">' . $noofuserattempts . ' (' . round(100 * $noofuserattempts / $noofusers)
             . '%)</div></td>';
         echo '</tr>';
         echo '<tr>';
@@ -675,11 +701,11 @@ class quiz_mcq_report extends quiz_default_report {
         echo '</tr>';
         echo '</tbody>';
         echo "</table>\n";
-        
+
         // Output: Key
         echo '<p class="mcq subheading"><a href="' . qualified_me() . '&highlightcorrect='
             . abs(1 - $highlightcorrect) . '">' . get_string('key', 'quiz_mcq') . '</a>:</p> ';
-        
+
         echo '<table id="key" class="generaltable mcq keytable">';
         echo '<tbody>';
         echo '<tr>';
@@ -693,7 +719,7 @@ class quiz_mcq_report extends quiz_default_report {
         echo '</tr>';
         echo '</tbody>';
         echo "</table>\n";
-        
+
         // Output: 'Options chosen' and 'Option counts' table
         echo '<table id="options" class="generaltable mcq optionstable">';
         // Label
@@ -713,18 +739,18 @@ class quiz_mcq_report extends quiz_default_report {
             . '<th class="header"><a href="' . qualified_me() . '&sort=' . $sortarg4 . '">'
             . get_string('qattempts', 'quiz_mcq') . '</a> (%)</th>';
 
-        foreach ($mcq_keys as $q) {
+        foreach ($mcqkeys as $q) {
             echo '<th class="header">' . get_string('questionabbr', 'quiz_mcq') . ($q + 1) . '</th>';
         }
         echo '</tr>';
         // Summary rows
         echo '<tr>';
         echo '<td colspan="4" class="subsubheading">' . get_string('correctoptions', 'quiz_mcq') . '</th>';
-        foreach ($mcq_keys as $q) {
+        foreach ($mcqkeys as $q) {
 
-		    if ($mcqids[$q][1] == 1) {
-			    $correctstring = implode(',', $fullycorrect[$q]);
-			} else {
+            if ($mcqids[$q][1] == 1) {
+                $correctstring = implode(',', $fullycorrect[$q]);
+            } else {
                 $correctstring = implode(',', $anycorrect[$q]);
             }
 
@@ -737,16 +763,19 @@ class quiz_mcq_report extends quiz_default_report {
         echo '</tr>';
         echo '<tr>';
         echo '<td colspan="4" class="subsubheading">' . get_string('totalcorrect', 'quiz_mcq') . '</th>';
-        foreach ($mcq_keys as $q) {
+        foreach ($mcqkeys as $q) {
             $noofcompleters = $noofuserattempts - $optioncounts[$q][0];
-            if ($noofcompleters == 0) { $noofcompleters = 1; } // Avoid division by zero
+            // Avoid division by zero
+            if ($noofcompleters == 0) {
+                $noofcompleters = 1;
+            }
             echo '<td class="data numeric">' . $noofuserscorrect[$q]
                 . ' (' . round(100 * $noofuserscorrect[$q] / $noofcompleters) . '%)' . '</td>';
         }
         echo '</tr>';
         echo '<tr>';
         echo '<td colspan="4" class="subsubheading">' . get_string('totalchoosing', 'quiz_mcq') . '</th>';
-        foreach ($mcq_keys as $q) {
+        foreach ($mcqkeys as $q) {
             echo '<td class="data numeric">'. ($noofuserattempts - $optioncounts[$q][0]) .'</td>';
         }
         echo '</tr>';
@@ -754,15 +783,15 @@ class quiz_mcq_report extends quiz_default_report {
         foreach ($optiondata as $optiondatarow) {
             echo '<tr>';
             // Output the first 4 columns individually and start the loop at 5
-            echo '<td>' . $optiondatarow[1] . '</td>';            
-            echo '<td>' . $optiondatarow[2] . '</td>';            
+            echo '<td>' . $optiondatarow[1] . '</td>';
+            echo '<td>' . $optiondatarow[2] . '</td>';
             echo '<td class="numeric">' . $optiondatarow[3]
-                . ' ('. round(100 * $optiondatarow[3] / $maxposs).'%)</td>';            
+                . ' ('. round(100 * $optiondatarow[3] / $maxposs).'%)</td>';
             echo '<td class="numeric">' . $optiondatarow[4]
-                . ' (' . round(100 * $optiondatarow[4] / $noofmcqs) . '%)</td>';    
+                . ' (' . round(100 * $optiondatarow[4] / $noofmcqs) . '%)</td>';
 
             for ($col = 5; $col < count($optiondatarow); $col++) {
-            
+
                 $correctclass = ' class="numeric"';
 
                 // Check whether the last character is a flag, and if so use it to determine the cell
@@ -772,7 +801,7 @@ class quiz_mcq_report extends quiz_default_report {
                            $correctclass = ' class="numeric correct"';
                     } else if (substr($optiondatarow[$col], -1) == 2) {
                            $correctclass = ' class="numeric partial"';
-					}
+                    }
                     // If there is no option, change the class to unanswered
                     if (substr($optiondatarow[$col], 0, 1) == '|') {
                         $correctclass = ' class="unanswered"';
@@ -781,7 +810,7 @@ class quiz_mcq_report extends quiz_default_report {
                     // Strip off the flag
                     $optiondatarow[$col] = substr($optiondatarow[$col], 0, -2);
                 }
-            
+
                 echo '<td' . $correctclass . '>' . $optiondatarow[$col] . '</td>';
             }
             echo '</tr>';
@@ -796,7 +825,7 @@ class quiz_mcq_report extends quiz_default_report {
         // Headers
         echo '<tr>';
         echo '<th colspan="4" class="header">' . get_string('option', 'quiz_mcq') . '</th>';
-        foreach ($mcq_keys as $q) {
+        foreach ($mcqkeys as $q) {
             echo '<th class="header qnum">' . get_string('questionabbr', 'quiz_mcq') . ($q + 1) . '</th>';
         }
         echo '</tr>';
@@ -808,37 +837,37 @@ class quiz_mcq_report extends quiz_default_report {
             } else {
                 echo '<td colspan="4">' . $opt . '</td>';
             }
-            foreach ($mcq_keys as $q) {
+            foreach ($mcqkeys as $q) {
 
                 // Cell classes depend on whether using positive or negative highlighting
                 if (in_array($opt, $fullycorrect[$q])) {
- 				    if ($highlightcorrect == 1) {
+                    if ($highlightcorrect == 1) {
                         $correctclass = ' class="numeric correct"';
-    				} else {
+                    } else {
                         $correctclass = ' class="numeric"';
-					}
+                    }
                 } else if (in_array($opt, $anycorrect[$q])) {
                     $correctclass = ' class="numeric partial"';
                 } else {
-				    if ($highlightcorrect == 1) {
+                    if ($highlightcorrect == 1) {
                         $correctclass = ' class="numeric"';
-					} else {
+                    } else {
                         $correctclass = ' class="numeric correct"';
-					}
-                }                    
-                
+                    }
+                }
+
                 // Override as unshaded if cell is not set
-				if (!isset($optioncounts[$q][$opt])) {
-				    $optioncounts[$q][$opt] = '';
-				}
-				
+                if (!isset($optioncounts[$q][$opt])) {
+                    $optioncounts[$q][$opt] = '';
+                }
+
                 if (preg_match('/^\s*$/', $optioncounts[$q][$opt])) {
                     $correctclass = ' class="numeric"';
                 }
 
                 echo '<td' . $correctclass . '>' . $optioncounts[$q][$opt] . '</td>';
             }
-            echo '</tr>';        
+            echo '</tr>';
         }
 
         echo '</tbody>';
@@ -855,8 +884,8 @@ class quiz_mcq_report extends quiz_default_report {
             echo '</tr>';
             foreach ($uncompletedusers as $user) {
                 echo '<tr>';
-                echo '<td>' . $user -> lastname . '</td>'
-                    . '<td>' . $user -> firstname . '</td>';
+                echo '<td>' . $user->lastname . '</td>'
+                    . '<td>' . $user->firstname . '</td>';
                 echo '</tr>';
             }
             echo '</tbody>';
@@ -864,18 +893,18 @@ class quiz_mcq_report extends quiz_default_report {
             echo '</form>';
 
         }
-    
+
     }
 
 
- 
+
     // Output for page
-    function output_print ($warnings, $nodata, $quiz, $reporturl, $groupnames, $filternames, $noofuserattempts,
+    protected function output_print ($warnings, $nodata, $quiz, $reporturl, $groupnames, $filternames, $noofuserattempts,
             $uncompletedusers, $maxposs, $maxgrade, $median, $mean, $highlightcorrect, $noofmcqs,
             $sortarg1, $sortarg2, $sortarg3, $sortarg4, $fullycorrect, $anycorrect, $noofuserscorrect, $optioncounts,
             $optiondata, $mcqids, $maxoptions, $groupids, $filter) {
 
-        $mcq_keys = array_keys($mcqids); // Reassign since we didn't pass it
+        $mcqkeys = array_keys($mcqids); // Reassign since we didn't pass it
 
         // Abort if nothing to display
         if ($nodata) {
@@ -888,12 +917,16 @@ class quiz_mcq_report extends quiz_default_report {
         // Calculate some local values
         $noofuncompletedusers = count($uncompletedusers);
         $noofusers = $noofuserattempts + $noofuncompletedusers;
-	if ($noofusers == 0) { $noofusers = 1; } // Avoid division by zero later on
-        
+
+        // Avoid division by zero later on
+        if ($noofusers == 0) {
+            $noofusers = 1;
+        }
+
         echo '<table width="100%"><tr><td width="50%">';
 
         // Output: Quiz close date and link to print view
-		$quizclose = $quiz->timeclose ? userdate($quiz->timeclose) : get_string('never', 'quiz_mcq');
+        $quizclose = $quiz->timeclose ? userdate($quiz->timeclose) : get_string('never', 'quiz_mcq');
         echo '<p><span class="mcq subheading">' . get_string('quizcloses', 'quiz_mcq')
             . ':</span> ' . $quizclose . '<br />';
 
@@ -905,8 +938,8 @@ class quiz_mcq_report extends quiz_default_report {
                 $groupslist .= $groupname[1] . ', ';
             }
         }
-		echo trim($groupslist, ', ');
-		
+        echo trim($groupslist, ', ');
+
         // Output: Filter name
         echo '<br /><span class="mcq subheading">' . get_string('filter', 'quiz_mcq') . ':</span> ';
         foreach ($filternames as $filtername) {
@@ -937,12 +970,12 @@ class quiz_mcq_report extends quiz_default_report {
 
         // Output: Sample summary table.
         echo '<p><span class="mcq subheading">' . get_string('samplesummary', 'quiz_mcq') . ':</span>';
-        
+
         echo '<table id="summary" class="mcq summarytable print">';
         echo '<tbody>';
         echo '<tr>';
         echo '<td>' . get_string('userscompleting', 'quiz_mcq') . '</td>';
-        echo '<td><div align="right">' . $noofuserattempts . ' (' . round(100 * $noofuserattempts / $noofusers) 
+        echo '<td><div align="right">' . $noofuserattempts . ' (' . round(100 * $noofuserattempts / $noofusers)
             . '%)</div></td>';
         echo '</tr>';
         echo '<tr>';
@@ -965,16 +998,16 @@ class quiz_mcq_report extends quiz_default_report {
         echo '</tr>';
         echo '</tbody>';
         echo "</table></p>\n";
-        
+
         echo '</td></tr></table>';
-        
+
         // Output: 'Options chosen' and 'Option counts' table
         echo '<table id="options" class="mcq optionstable print"><tbody>';
         // Loop through blocks
         $noofblocks = ceil($noofmcqs / $blocksize);
         for ($blk = 0; $blk < $noofblocks; $blk++) {
             // Calc noof questions in this block
-            if ($blk == $noofblocks-1) {
+            if ($blk == $noofblocks - 1) {
                 $noofmcqsinblock = $noofmcqs - $blk * $blocksize;
             } else {
                 $noofmcqsinblock = $blocksize;
@@ -1001,8 +1034,8 @@ class quiz_mcq_report extends quiz_default_report {
                 . '<th class="header"><a href="' . qualified_me() . '&sort=' . $sortarg4 . '">'
                 . get_string('qattempts', 'quiz_mcq') . '</a> (%)</th>';
 
-            for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {	
-			    $q = $mcq_keys[$qidx];
+            for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {
+                $q = $mcqkeys[$qidx];
                 echo '<th class="header">' . get_string('questionabbr', 'quiz_mcq') . ($q + 1) . '</th>';
             }
             echo '</tr>';
@@ -1010,36 +1043,38 @@ class quiz_mcq_report extends quiz_default_report {
             echo '<tr>';
             echo '<td colspan="4" class="subsubheading">' . get_string('correctoptions', 'quiz_mcq') . '</th>';
             for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {
-			
-			    $q = $mcq_keys[$qidx];
-			
+
+                $q = $mcqkeys[$qidx];
+
                 if ($mcqids[$q][1] == 1) {
                     $correctstring = implode(',', $fullycorrect[$q]);
                 } else {
                     $correctstring = implode(',', $anycorrect[$q]);
                 }
-			
+
                 if ($highlightcorrect == 1) {
                     echo '<td class="data numeric correct">' . $correctstring . '</td>';
                 } else {
-                    echo '<td class="data numeric">' . $correctstring . '</td>';            
+                    echo '<td class="data numeric">' . $correctstring . '</td>';
                 }
             }
             echo '</tr>';
             echo '<tr>';
             echo '<td colspan="4" class="subsubheading">' . get_string('totalcorrect', 'quiz_mcq') . '</th>';
             for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {
-                $q = $mcq_keys[$qidx];
+                $q = $mcqkeys[$qidx];
                 $noofcompleters = $noofuserattempts - $optioncounts[$q][0];
-                if ($noofcompleters == 0) { $noofcompleters = 1; } // Avoid division by zero
+                if ($noofcompleters == 0) {
+                    $noofcompleters = 1;
+                } // Avoid division by zero
                 echo '<td class="data numeric">' . $noofuserscorrect[$q]
                     . ' (' . round(100 * $noofuserscorrect[$q] / $noofcompleters) . '%)' . '</td>';
             }
             echo '</tr>';
             echo '<tr>';
             echo '<td colspan="4" class="subsubheading">' . get_string('totalchoosing', 'quiz_mcq') . '</th>';
-            for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {	
-			    $q = $mcq_keys[$qidx];
+            for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {
+                $q = $mcqkeys[$qidx];
                 echo '<td class="data numeric">'. ($noofuserattempts - $optioncounts[$q][0]) .'</td>';
             }
             echo '</tr>';
@@ -1047,15 +1082,15 @@ class quiz_mcq_report extends quiz_default_report {
             foreach ($optiondata as $optiondatarow) {
                 echo '<tr>';
                 // Output the first 4 columns individually and start the loop at the next question for this block
-                echo '<td>' . $optiondatarow[1] . '</td>';            
-                echo '<td>' . $optiondatarow[2] . '</td>';            
+                echo '<td>' . $optiondatarow[1] . '</td>';
+                echo '<td>' . $optiondatarow[2] . '</td>';
                 echo '<td class="numeric">' . $optiondatarow[3]
-                    . ' ('. round(100 * $optiondatarow[3] / $maxposs).'%)</td>';            
+                    . ' ('. round(100 * $optiondatarow[3] / $maxposs).'%)</td>';
                 echo '<td class="numeric">' . $optiondatarow[4]
-                    . ' (' . round(100 * $optiondatarow[4] / $noofmcqs) . '%)</td>';    
+                    . ' (' . round(100 * $optiondatarow[4] / $noofmcqs) . '%)</td>';
 
                 for ($col = $blk * $blocksize + 5; $col < ($blk * $blocksize + $noofmcqsinblock + 5); $col++) {
-            
+
                     $correctclass = ' class="numeric"';
 
                     // Check whether the last character is a flag, and if so use it to determine the cell
@@ -1074,7 +1109,7 @@ class quiz_mcq_report extends quiz_default_report {
                         // Strip off the flag
                         $optiondatarow[$col] = substr($optiondatarow[$col], 0, -2);
                     }
-            
+
                     echo '<td' . $correctclass . '>' . $optiondatarow[$col] . '</td>';
                 }
                 echo '</tr>';
@@ -1083,65 +1118,71 @@ class quiz_mcq_report extends quiz_default_report {
             // 'Option counts' starts here
             // Label
             echo '<tr class="optioncounts"><th colspan="' . ($blocksize + 4)
-			    . '" class="subheading">&nbsp;</th></tr><tr>';
+                . '" class="subheading">&nbsp;</th></tr><tr>';
             echo '<th colspan="' . ($blocksize + 4) . '" class="subheading">'
                . get_string('optioncounts', 'quiz_mcq') . ':<br /></th>';
             echo '</tr>';
             // Headers
             echo '<tr>';
             echo '<th colspan="4" class="header">' . get_string('option', 'quiz_mcq') . '</th>';
-            for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {	
-			    $q = $mcq_keys[$qidx];
+            for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {
+                $q = $mcqkeys[$qidx];
                 echo '<th class="header qnum">' . get_string('questionabbr', 'quiz_mcq') . ($q + 1) . '</th>';
             }
             echo '</tr>';
             // Data
             for ($opt = 0; $opt <= $maxoptions; $opt++) {
-                echo '<tr>';
+                // Avoid page breaks mid-table, where possible
+                if ($opt < $maxoptions) {
+                    $breakclass = 'class="printnobreak"';
+                } else {
+                    $breakclass = '';
+                }
+                echo '<tr ' . $breakclass . '>';
                 if ($opt == 0) {
                     echo '<td colspan="4">' . get_string('nochoice', 'quiz_mcq') . '</td>';
                 } else {
                     echo '<td colspan="4">' . $opt . '</td>';
                 }
-                for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {	
-			        $q = $mcq_keys[$qidx];
-                
+                for ($qidx = $blk * $blocksize; $qidx < ($blk * $blocksize + $noofmcqsinblock); $qidx++) {
+                    $q = $mcqkeys[$qidx];
+
                     // Cell classes depend on whether using positive or negative highlighting
                     if (in_array($opt, $fullycorrect[$q])) {
-    				    if ($highlightcorrect == 1) {
+                        if ($highlightcorrect == 1) {
                             $correctclass = ' class="numeric correct"';
-	    				} else {
+                        } else {
                             $correctclass = ' class="numeric"';
-						}
+                        }
                     } else if (in_array($opt, $anycorrect[$q])) {
                         $correctclass = ' class="numeric partial"';
                     } else {
-					    if ($highlightcorrect == 1) {
+                        if ($highlightcorrect == 1) {
                             $correctclass = ' class="numeric"';
-						} else {
+                        } else {
                             $correctclass = ' class="numeric correct"';
-						}
+                        }
                     }
-        
+
                     // Override as unshaded if cell is empty
-    				if (empty($optioncounts[$q][$opt])) {
-	    			    $optioncounts[$q][$opt] = '';
-		    		}
-					
+                    if (!isset($optioncounts[$q][$opt])) {
+                        $optioncounts[$q][$opt] = '';
+                    }
+
                     if (preg_match('/^\s*$/', $optioncounts[$q][$opt])) {
                         $correctclass = ' class="numeric"';
                     }
 
                     echo '<td' . $correctclass . '>' . $optioncounts[$q][$opt] . '</td>';
                 }
-                echo '</tr>';        
+                echo '</tr>';
             }
         }
 
         echo '</tbody>';
         echo '</table>';
 
-        // 'Users yet to complete' table. Only show this if populated
+        // Users Yet To Complete table. Only show this if populated
         if (count($uncompletedusers) > 0) {
             echo '<p class="mcq subheading">' . get_string('usersyettocomplete', 'quiz_mcq') . ':</p>';
             echo '<table id="summary" class="mcq summarytable print">';
@@ -1152,8 +1193,8 @@ class quiz_mcq_report extends quiz_default_report {
             echo '</tr>';
             foreach ($uncompletedusers as $user) {
                 echo '<tr>';
-                echo '<td>' . $user -> lastname . '</td>'
-                    . '<td>' . $user -> firstname . '</td>';
+                echo '<td>' . $user->lastname . '</td>'
+                    . '<td>' . $user->firstname . '</td>';
                 echo '</tr>';
             }
             echo '</tbody>';
@@ -1165,7 +1206,7 @@ class quiz_mcq_report extends quiz_default_report {
 
 
     // Comparison functions for sorting alphabetically by column in a 2D array
-    function lastname_cmp($a, $b) {
+    protected function lastname_cmp($a, $b) {
         // Sort on first column (lastname), then second (firstname)
         if (strnatcasecmp($a[1], $b[1]) == 0) {
             return strnatcasecmp($a[2], $b[2]);
@@ -1174,7 +1215,7 @@ class quiz_mcq_report extends quiz_default_report {
         }
     }
 
-    function firstname_cmp($a, $b) {
+    protected function firstname_cmp($a, $b) {
         // Sort on second column (firstname), then first (lastname)
         if (strnatcasecmp($a[2], $b[2]) == 0) {
             return strnatcasecmp($a[1], $b[1]);
@@ -1183,7 +1224,7 @@ class quiz_mcq_report extends quiz_default_report {
         }
     }
 
-    function grade_cmp($a, $b) {
+    protected function grade_cmp($a, $b) {
         // Sort on third column (grade), then first (lastname)
         // NOTE usort expects an integer back from this function so returning a straight
         // subtraction doesn't work
@@ -1196,7 +1237,7 @@ class quiz_mcq_report extends quiz_default_report {
         }
     }
 
-    function qattempts_cmp($a, $b) {
+    protected function qattempts_cmp($a, $b) {
         // Sort on fourth column (noofattempts), then first (lastname)
         if ($a[4] - $b[4] == 0) {
             return strnatcasecmp($a[1], $b[1]);

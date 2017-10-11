@@ -25,8 +25,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version  = 2013090900;
-$plugin->requires = 2011120500; // i.e. Moodle 2.2
-$plugin->release  = "2.0 (build 2013090900)";
-$plugin->maturity  = MATURITY_STABLE;
+$plugin->version  = 2014020602;
+$plugin->requires = 2013111802;
+$plugin->release  = "2.1 (for Moodle 2.6)";
+$plugin->maturity  = MATURITY_BETA;
 $plugin->component = 'quiz_mcq';

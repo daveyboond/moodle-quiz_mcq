@@ -61,28 +61,32 @@ table.mcq td.numeric {
 }
 
 table.mcq td.correct {
-  background-color: #CCFFCC;
+  background-color: #CCFFCC !important;
 }
 
 table.mcq.print td.correct {
-  background-color: #808080;
+  background-color: #909090 !important;
+  background-image: url([[pix:quiz_mcq|shade_909090]]);
   font-weight: bold;
 }
 
 table.mcq td.partial {
-  background-color: #FFFFCC;
+  background-color: #FFFFCC !important;
 }
 
 table.mcq.print td.partial {
-  background-color: #EEEEEE;
+  background-color: #D6D6D6 !important;
+  background-image: url([[pix:quiz_mcq|shade_D6D6D6]]);
 }
 
 table.mcq td.unanswered {
-  background-color: #CCCCFF;
+  background-color: #CCCCFF !important;
 }
 
 table.mcq.print td.unanswered {
-  background-color: #B6B6B6;
+  background-color: #B6B6B6 !important;
+  background-image: url([[pix:quiz_mcq|shade_B6B6B6]]);
+
 }
 
 table.mcq.keytable.print td.subheading {
@@ -95,4 +99,10 @@ table.mcq.keytable.print td.subheading {
 table.mcq.optionstable.print th.qnum {
   padding-left: 1em;
   padding-right: 1em;
+}
+
+@media print {
+    table.mcq.print tr.printnobreak {
+        page-break-after: avoid;
+    }
 }
